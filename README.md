@@ -9,7 +9,7 @@
 - First install following package using this command
 
 ```
-npm install express graphql express-graphql
+npm install express graphql express-graphql (it may change)
 ```
 
 - After this here's starting code
@@ -219,4 +219,108 @@ type Character {
   name: String!
   appearsIn: [Episode]!
 }
+```
+
+4. **Interface:**
+
+- we can define interface using `interface` keyword.
+- If any type object implements interface using `implements` keyword then that type of object has to all field which interface has.
+
+code example:
+
+```
+interface Book{
+  id: Int,
+  name: String,
+  pnrNo: Int
+}
+
+type Person implements Book {
+  id: Int
+  name: String
+  age: Int
+  pnrNo: Int
+  posts: [Post]
+  comments: [Comment]
+}
+```
+
+5. **Union Types:**
+
+- Union types is made for multiple returning object like `Person and Post`.
+- Keyword is `union`
+
+code example:
+
+```
+union SearchResult = Person | Post
+```
+
+use case in code:
+
+```
+union SearchResult = Person | Post
+
+type Query{
+  search(text: String!): [SearchResult]
+}
+const resolvers = {
+  Query: {
+     search: (_, { text }) => {
+      const searchResults = [];
+      const lowercaseText = text.toLowerCase();
+
+      searchResults.push(
+        ...peopleData.filter((person) =>
+          person.name.toLowerCase().includes(lowercaseText)
+        )
+      );
+      searchResults.push(
+        ...postsData.filter((post) =>
+          post.title.toLowerCase().includes(lowercaseText)
+        )
+      );
+
+      return searchResults;
+    },
+  },
+  SearchResult: {
+    __resolveType: (obj) => {
+      if (obj.title) return "Post";
+      if (obj.name) return "Person";
+      return null;
+    },
+  },
+}
+```
+
+6. **Input Types:**
+
+- input types is for mutation like we make input type and give to mutation function as argument
+- Declaring keyword is `input`.
+
+code example:
+
+```
+input NewPersonInput {
+  name: String
+  age: Int
+}
+
+type Mutation {
+    addPerson(input: NewPersonInput): Person
+}
+
+// inside resolver
+ Mutation: {
+    addPerson: (_, { input }) => {
+      const newPerson = {
+        id: peopleData.length + 1,
+        name: input.name,
+        age: input.age,
+      };
+      peopleData.push(newPerson);
+      return newPerson;
+    },
+ }
 ```
