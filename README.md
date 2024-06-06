@@ -1,8 +1,8 @@
 # GraphQL Learning
 
 - Query language for api , you can use both database relational and non-relational.
-- We can define schema of api using `type` and `resolver` function.
-- Each `type` has `one resolver` function.
+- We can define schema of api using `query` and `resolver` function.
+- Each `Query` has `one resolver` function.
 
 ## Learn how to build your own graphQl interface
 
