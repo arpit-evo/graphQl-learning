@@ -1,11 +1,11 @@
 const express = require("express");
 const { graphqlHTTP } = require("express-graphql");
-const { buildSchema } = require("graphql");
+const { makeExecutableSchema } = require("@graphql-tools/schema"); 
 
 const app = express();
 
 // Define the schema with various types, queries, and mutations
-const schema = buildSchema(`
+const typeDefs = `
   type Query {
     person(id: Int!): Person
     people: [Person]
@@ -13,10 +13,11 @@ const schema = buildSchema(`
     posts: [Post]
     comment(id: Int!): Comment
     comments: [Comment]
+    search(text: String!): [SearchResult]
   }
 
   type Mutation {
-    addPerson(name: String!, age: Int!): Person
+    addPerson(input: NewPersonInput): Person
     updatePerson(id: Int!, name: String, age: Int): Person
     deletePerson(id: Int!): Person
     addPost(authorId: Int!, title: String!, content: String!): Post
@@ -27,7 +28,20 @@ const schema = buildSchema(`
     deleteComment(id: Int!): Comment
   }
 
-  type Person {
+  interface Character {
+    id: Int
+    name: String
+    age: Int
+  }
+
+  union SearchResult = Person | Post
+
+  input NewPersonInput {
+    name: String
+    age: Int
+  }
+
+  type Person implements Character {
     id: Int
     name: String
     age: Int
@@ -49,7 +63,7 @@ const schema = buildSchema(`
     author: Person
     post: Post
   }
-`);
+`;
 
 // Sample data
 let peopleData = [
@@ -79,73 +93,98 @@ let commentsData = [
 ];
 
 // Define the root resolver
-const root = {
-  person: ({ id }) => peopleData.find((person) => person.id === id),
-  people: () => peopleData,
-  post: ({ id }) => postsData.find((post) => post.id === id),
-  posts: () => postsData,
-  comment: ({ id }) => commentsData.find((comment) => comment.id === id),
-  comments: () => commentsData,
-  addPerson: ({ name, age }) => {
-    const newPerson = { id: peopleData.length + 1, name, age };
-    peopleData.push(newPerson);
-    return newPerson;
+const resolvers = {
+  Query: {
+    person: (_, { id }) => peopleData.find((person) => person.id === id),
+    people: () => peopleData,
+    post: (_, { id }) => postsData.find((post) => post.id === id),
+    posts: () => postsData,
+    comment: (_, { id }) => commentsData.find((comment) => comment.id === id),
+    comments: () => commentsData,
+    search: (_, { text }) => {
+      const searchResults = [];
+      const lowercaseText = text.toLowerCase();
+
+      searchResults.push(
+        ...peopleData.filter((person) =>
+          person.name.toLowerCase().includes(lowercaseText)
+        )
+      );
+      searchResults.push(
+        ...postsData.filter((post) =>
+          post.title.toLowerCase().includes(lowercaseText)
+        )
+      );
+
+      return searchResults;
+    },
   },
-  updatePerson: ({ id, name, age }) => {
-    const person = peopleData.find((p) => p.id === id);
-    if (!person) return null;
-    if (name !== undefined) person.name = name;
-    if (age !== undefined) person.age = age;
-    return person;
-  },
-  deletePerson: ({ id }) => {
-    const personIndex = peopleData.findIndex((p) => p.id === id);
-    if (personIndex === -1) return null;
-    const [deletedPerson] = peopleData.splice(personIndex, 1);
-    postsData = postsData.filter((post) => post.authorId !== id);
-    commentsData = commentsData.filter((comment) => comment.authorId !== id);
-    return deletedPerson;
-  },
-  addPost: ({ authorId, title, content }) => {
-    const newPost = { id: postsData.length + 1, title, content, authorId };
-    postsData.push(newPost);
-    return newPost;
-  },
-  updatePost: ({ id, title, content }) => {
-    const post = postsData.find((p) => p.id === id);
-    if (!post) return null;
-    if (title !== undefined) post.title = title;
-    if (content !== undefined) post.content = content;
-    return post;
-  },
-  deletePost: ({ id }) => {
-    const postIndex = postsData.findIndex((p) => p.id === id);
-    if (postIndex === -1) return null;
-    const [deletedPost] = postsData.splice(postIndex, 1);
-    commentsData = commentsData.filter((comment) => comment.postId !== id);
-    return deletedPost;
-  },
-  addComment: ({ postId, authorId, content }) => {
-    const newComment = {
-      id: commentsData.length + 1,
-      content,
-      authorId,
-      postId,
-    };
-    commentsData.push(newComment);
-    return newComment;
-  },
-  updateComment: ({ id, content }) => {
-    const comment = commentsData.find((c) => c.id === id);
-    if (!comment) return null;
-    if (content !== undefined) comment.content = content;
-    return comment;
-  },
-  deleteComment: ({ id }) => {
-    const commentIndex = commentsData.findIndex((c) => c.id === id);
-    if (commentIndex === -1) return null;
-    const [deletedComment] = commentsData.splice(commentIndex, 1);
-    return deletedComment;
+  Mutation: {
+    addPerson: (_, { input }) => {
+      const newPerson = {
+        id: peopleData.length + 1,
+        name: input.name,
+        age: input.age,
+      };
+      peopleData.push(newPerson);
+      return newPerson;
+    },
+    updatePerson: (_, { id, name, age }) => {
+      const person = peopleData.find((p) => p.id === id);
+      if (!person) return null;
+      if (name !== undefined) person.name = name;
+      if (age !== undefined) person.age = age;
+      return person;
+    },
+    deletePerson: (_, { id }) => {
+      const personIndex = peopleData.findIndex((p) => p.id === id);
+      if (personIndex === -1) return null;
+      const [deletedPerson] = peopleData.splice(personIndex, 1);
+      postsData = postsData.filter((post) => post.authorId !== id);
+      commentsData = commentsData.filter((comment) => comment.authorId !== id);
+      return deletedPerson;
+    },
+    addPost: (_, { authorId, title, content }) => {
+      const newPost = { id: postsData.length + 1, title, content, authorId };
+      postsData.push(newPost);
+      return newPost;
+    },
+    updatePost: (_, { id, title, content }) => {
+      const post = postsData.find((p) => p.id === id);
+      if (!post) return null;
+      if (title !== undefined) post.title = title;
+      if (content !== undefined) post.content = content;
+      return post;
+    },
+    deletePost: (_, { id }) => {
+      const postIndex = postsData.findIndex((p) => p.id === id);
+      if (postIndex === -1) return null;
+      const [deletedPost] = postsData.splice(postIndex, 1);
+      commentsData = commentsData.filter((comment) => comment.postId !== id);
+      return deletedPost;
+    },
+    addComment: (_, { postId, authorId, content }) => {
+      const newComment = {
+        id: commentsData.length + 1,
+        content,
+        authorId,
+        postId,
+      };
+      commentsData.push(newComment);
+      return newComment;
+    },
+    updateComment: (_, { id, content }) => {
+      const comment = commentsData.find((c) => c.id === id);
+      if (!comment) return null;
+      if (content !== undefined) comment.content = content;
+      return comment;
+    },
+    deleteComment: (_, { id }) => {
+      const commentIndex = commentsData.findIndex((c) => c.id === id);
+      if (commentIndex === -1) return null;
+      const [deletedComment] = commentsData.splice(commentIndex, 1);
+      return deletedComment;
+    },
   },
   Person: {
     posts: (person) => postsData.filter((post) => post.authorId === person.id),
@@ -162,14 +201,22 @@ const root = {
       peopleData.find((person) => person.id === comment.authorId),
     post: (comment) => postsData.find((post) => post.id === comment.postId),
   },
+  SearchResult: {
+    __resolveType: (obj) => {
+      if (obj.title) return "Post";
+      if (obj.name) return "Person";
+      return null;
+    },
+  },
 };
+
+const schema = makeExecutableSchema({typeDefs, resolvers})
 
 // Setup the GraphQL endpoint with GraphiQL enabled
 app.use(
   "/graphql",
   graphqlHTTP({
     schema: schema,
-    rootValue: root,
     graphiql: true, // Enable GraphiQL interface
   })
 );
