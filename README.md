@@ -324,3 +324,7 @@ type Mutation {
     },
  }
 ```
+command for initialize git sub module
+```
+git submodule update --init --recursive
+```
