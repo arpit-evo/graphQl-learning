@@ -8,13 +8,13 @@
 
 - First install following package using this command
 
-```
-npm install express graphql express-graphql (it may change)
+```bash
+npm install express graphql express-graphql #(it may change)
 ```
 
 - After this here's starting code
 
-```
+```garphql
 const schema = buildSchema(`
   type Query {
     hello: String
